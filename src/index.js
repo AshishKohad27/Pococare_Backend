@@ -18,6 +18,7 @@ const app = express();
 
 //6. App use
 app.use(express.json());
+app.use(cors());
 app.use("/auth", authRoutes);
 app.use("/blacklist", blackListRoute);
 

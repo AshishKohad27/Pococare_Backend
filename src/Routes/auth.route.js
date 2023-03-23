@@ -10,11 +10,6 @@ const { middleWareAuth } = require("../Middleware/MiddleWareAuth");
 //2. Create
 const authRoutes = express.Router();
 
-//checking for other pages
-authRoutes.get("/page", middleWareAuth, async (req, res) => {
-    res.send("About Page")
-})
-//checking for other pages
 
 
 //3. Methods
@@ -72,38 +67,38 @@ authRoutes.post("/signup", async (req, res) => {
 authRoutes.post("/login", async (req, res) => {
     //1. Getting data from body
     const { email, password } = req.body;
-    // console.log('email, password:', email, password)
+    console.log('email, password:', email, password)
     try {
         const userExistOrNot = await authModel.findOne({ email });
 
-        //1. if user not signup in our app he have to signup first
+        //2. if user not signup in our app he have to signup first
         if (userExistOrNot.length === 0) {
             return res.status(400).send({
                 message: "User With this Email Id Not Exist!",
             });
         }
 
-        //2. password verify by argon2 package
+        //3. password verify by argon2 package
         if (await argon2.verify(userExistOrNot.password, password)) {
             //3. Creating Token
-            const token = jwt.sign(
+            const access_token = jwt.sign(
                 { _id: userExistOrNot._id, email: userExistOrNot.email },
                 "POCOCARE_27",
-                { expiresIn: "20s" }
+                { expiresIn: "3min" }
             );
 
             //4. Create Refresh Token
-            const refreshToken = jwt.sign(
+            const refresh_token = jwt.sign(
                 { _id: userExistOrNot._id },
                 "POCOCARE_27_REFRESH",
-                { expiresIn: "1min" }
+                { expiresIn: "5min" }
             );
 
             return res
                 .status(201)
-                .send({ message: "Login Successfully!", token, refreshToken });
+                .send({ message: "Login Successfully!", access_token, refresh_token });
         } else {
-            return res.status(400).send({
+            return res.status(203).send({
                 message: "Wrong Credentials",
             });
         }
@@ -119,7 +114,8 @@ authRoutes.post("/login", async (req, res) => {
 //3.3 Refresh Token
 authRoutes.post("/refresh", async (req, res) => {
     //1. Taking token from headers
-    const refreshToken = req.headers["authorization"];
+    const refreshToken = req.headers["authorization_refresh"];
+    console.log('refreshToken from Refresh:', refreshToken)
 
     //2. if token not present in header
     if (!refreshToken) {
@@ -138,27 +134,68 @@ authRoutes.post("/refresh", async (req, res) => {
             const newToken = jwt.sign(
                 { _id: auth._id, email: auth.email },
                 "POCOCARE_27",
-                { expiresIn: "20s" }
+                { expiresIn: "3min" }
             );
-            return res.send({ token: newToken });
+            return res.send({ access_token: newToken });
         }
     } catch (e) {
         return res.status(401).send({
-            message: "Token Expired!",
+            message: "Refresh Token Expired!",
             desc: e.message,
         });
     }
 });
 
 authRoutes.post("/logout", async (req, res) => {
-    const token = req.headers['authorization'];
+    const access_token = req.headers['authorization_access'];
+    const refresh_token = req.headers['authorization_refresh'];
     // console.log('token:', token)
-    const tokenPush = new blacklistModel({
-        blackListItem: token
+    const tokenPushAccess = new blacklistModel({
+        blackListItem: access_token
     })
-    await tokenPush.save();
+    await tokenPushAccess.save();
+    const tokenPushRefresh = new blacklistModel({
+        blackListItem: refresh_token
+    })
+    await tokenPushRefresh.save();
     return res.send({ message: "user logged out successfully" })
 });
+
+authRoutes.post("/verify", async (req, res) => {
+    const { token } = req.body;
+    if (token === undefined) {
+        return res.send("Unauthorized");
+    }
+    try {
+        const verification = jwt.verify(token, "POCOCARE_27");
+        if (verification) {
+            return res.status(200).send(verification);
+        }
+    } catch (e) {
+        console.log('e:', e.message);
+        if (e.message === "jwt expired") {
+            const tokenPush = new blacklistModel({
+                blackListItem: token
+            })
+            await tokenPush.save();
+        }
+        return res.status(403).send({ message: "Access Token Expired!" });
+    }
+});
+
+
+//checking for other pages
+authRoutes.get("/page", middleWareAuth, async (req, res) => {
+    // const access_token = req.headers['authorization_access'];
+    // const tokenInBlackList = await blacklistModel.find({ blackListItem: access_token })
+    // if (tokenInBlackList.length !== 0) {
+    //     return res.status(401).send({
+    //         message: "Token is Invalid"
+    //     })
+    // }
+    res.status(201).send({ message: "Valid Page!" })
+})
+//checking for other pages
 
 //4. Exports
 module.exports = authRoutes;

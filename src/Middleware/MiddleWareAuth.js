@@ -2,7 +2,8 @@
 const jwt = require("jsonwebtoken")
 
 const middleWareAuth = async (req, res, next) => {
-    const accessToken = req.headers["authorization"];
+    const accessToken = req.headers["authorization_access"];
+    // console.log('accessToken MiddleWare:', accessToken)
 
     if (!accessToken) {
         return res.send({ message: "Unauthorized users" })
@@ -15,7 +16,7 @@ const middleWareAuth = async (req, res, next) => {
         }
     } catch (e) {
         return res.send({
-            message: "Token Expired!",
+            message: "Access Token Expired!",
             desc: e.message
         })
     }
